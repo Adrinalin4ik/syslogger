@@ -6,7 +6,7 @@ class Syslogger
 
   MUTEX = Mutex.new
 
-  attr_reader :level, :ident, :options, :facility, :max_octets
+  attr_reader :default_level, :ident, :options, :facility, :max_octets
   attr_accessor :formatter
 
   MAPPING = {
@@ -43,11 +43,11 @@ class Syslogger
   #   logger.info "my_subapp" { "Some lazily computed message" }
   #
   def initialize(ident = $0, options = Syslog::LOG_PID | Syslog::LOG_CONS, facility = nil)
-    @ident     = ident
-    @options   = options || (Syslog::LOG_PID | Syslog::LOG_CONS)
-    @facility  = facility
-    @level     = Logger::INFO
-    @formatter = proc do |_, _, _, msg|
+    @ident         = ident
+    @options       = options || (Syslog::LOG_PID | Syslog::LOG_CONS)
+    @facility      = facility
+    @default_level = Logger::INFO
+    @formatter     = proc do |_, _, _, msg|
       msg
     end
   end
@@ -57,13 +57,13 @@ class Syslogger
     #  Default params not supported in ruby 1.8.7
     define_method logger_method.to_sym do |*args, &block|
       severity = Logger.const_get(logger_method.upcase)
-      return true if @level > severity
+      return true if level > severity
       add(severity, nil, args.first, &block)
     end
 
     unless logger_method == 'unknown'
       define_method "#{logger_method}?".to_sym do
-        @level <= Logger.const_get(logger_method.upcase)
+        level <= Logger.const_get(logger_method.upcase)
       end
     end
   end
@@ -93,7 +93,7 @@ class Syslogger
       message, progname = progname, nil
     end
     progname ||= @ident
-    mask = Syslog::LOG_UPTO(MAPPING[@level])
+    mask = Syslog::LOG_UPTO(MAPPING[level])
     communication = message || block && block.call
     formatted_communication = clean(formatter.call(severity, Time.now, progname, communication))
 
@@ -109,7 +109,15 @@ class Syslogger
   # Sets the minimum level for messages to be written in the log.
   # +level+:: one of <tt>Logger::DEBUG</tt>, <tt>Logger::INFO</tt>, <tt>Logger::WARN</tt>, <tt>Logger::ERROR</tt>, <tt>Logger::FATAL</tt>, <tt>Logger::UNKNOWN</tt>
   def level=(level)
-    @level = sanitize_level(level)
+    Thread.current[:syslogger_level] = sanitize_level(level)
+  end
+
+  def level
+    Thread.current[:syslogger_level] || default_level
+  end
+
+  def default_level=(level)
+    @default_level = sanitize_level(level)
   end
 
   # Sets the ident string passed along to Syslog
