@@ -47,9 +47,7 @@ class Syslogger
     @options   = options || (Syslog::LOG_PID | Syslog::LOG_CONS)
     @facility  = facility
     @level     = Logger::INFO
-    @formatter = proc do |_, _, _, msg|
-      msg
-    end
+    @formatter = SimpleFormatter.new
   end
 
   %w{debug info warn error fatal unknown}.each do |logger_method|
@@ -197,6 +195,13 @@ class Syslogger
           s.log(MAPPING[severity], "#{tags_text}#{formatted_communication}")
         end
       end
+    end
+  end
+
+  class SimpleFormatter < Logger::Formatter
+    # This method is invoked when a log event occurs
+    def call(severity, timestamp, progname, msg)
+      msg
     end
   end
 end
