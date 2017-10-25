@@ -132,11 +132,11 @@ class Syslogger
   end
 
   def pop_tags(size = 1)
-    current_tags.pop size
+    current_tags.pop size if current_tags
   end
 
   def clear_tags!
-    current_tags.clear
+    current_tags.clear if current_tags
   end
 
   def current_tags
@@ -172,7 +172,7 @@ class Syslogger
   private
 
   def tags_text
-    tags = current_tags
+    tags = current_tags || ""
     if tags.any?
       clean(tags.collect { |tag| "[#{tag}] " }.join) << ' '
     end
